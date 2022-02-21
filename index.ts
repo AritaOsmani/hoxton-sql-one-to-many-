@@ -28,6 +28,23 @@ const getMuseumById = db.prepare(`
     SELECT*FROM museums WHERE id =?;
 `)
 
+const createMuseum = db.prepare(`
+    INSERT INTO museums (name,city) VALUES (?,?);
+`)
+const createWork = db.prepare(`
+    INSERT INTO works (name,picture,museumId) VALUES (?,?,?);
+`)
+
+const deleteWork = db.prepare(`
+    DELETE FROM works WHERE id=?
+`)
+const deleteMuseum = db.prepare(`
+    DELETE FROM museums WHERE id = ?;
+`)
+const deleteMuseumWorks = db.prepare(`
+    DELETE FROM works WHERE museumId = ?;
+`)
+
 app.get('/museums', (req, res) => {
 
     const museums = getMuseums.all();
@@ -72,9 +89,87 @@ app.get('/works/:id', (req, res) => {
     }
 })
 
-// app.post('/museums',(req,res)=>{
+app.post('/museums', (req, res) => {
+    const { name, city } = req.body;
+    const errors = []
 
-// })
+    if (typeof name !== 'string') {
+        errors.push('Name missing or not a string!')
+    }
+    if (typeof city !== 'string') {
+        errors.push('City missing or not a string!')
+    }
+
+    if (errors.length === 0) {
+        const result = createMuseum.run(name, city)
+        const newMuseum = getMuseumById.get(result.lastInsertRowid);
+        res.send(newMuseum)
+    } else {
+        res.status(400).send(errors)
+    }
+})
+
+app.post('/works', (req, res) => {
+    const { name, picture, museumId } = req.body;
+    const errors = []
+
+    if (typeof name !== 'string') {
+        errors.push('Name missing or not a string!')
+    }
+    if (typeof picture !== 'string') {
+        errors.push('Picture missing or not a string!')
+    }
+    if (typeof museumId !== 'number') {
+        errors.push('Museum id missing or not a number!')
+    }
+
+    if (errors.length === 0) {
+        const museum = getMuseumById.get(museumId)
+        if (museum) {
+            const result = createWork.run(name, picture, museumId)
+            const newWork = getWorksById.get(result.lastInsertRowid)
+            res.status(200).send(newWork)
+        } else {
+            res.status(404).send('This museum does not exist!')
+        }
+    } else {
+        res.status(400).send(errors)
+    }
+})
+
+app.delete('/museums/:id', (req, res) => {
+    const id = req.params.id;
+
+    const matchedMuseum = getMuseumById.get(id);
+
+    if (matchedMuseum) {
+        deleteMuseumWorks.run(id);
+        const result = deleteMuseum.run(id);
+        if (result.changes !== 0) {
+            res.send({ message: 'Museum deleted sucessfully!' })
+        } else {
+            res.status(400).send({ error: 'Something went wrong!' })
+        }
+    } else {
+        res.status(404).send({ message: 'Museum does not exist!' })
+    }
+})
+
+app.delete('/works/:id', (req, res) => {
+    const id = req.params.id;
+    const matchedWork = getWorksById.get(id)
+
+    if (matchedWork) {
+        const result = deleteWork.run(id)
+        if (result.changes !== 0) {
+            res.send({ message: 'Work deleted sucessfully!' })
+        } else {
+            res.status(400).send({ error: 'Something went wrong!' })
+        }
+    } else {
+        res.status(404).send({ error: 'Work not found!' })
+    }
+})
 
 app.listen(PORT, () => {
     console.log(`Server running on http://localhost:${PORT}`)
