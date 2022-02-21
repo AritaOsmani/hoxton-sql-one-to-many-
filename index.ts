@@ -45,6 +45,13 @@ const deleteMuseumWorks = db.prepare(`
     DELETE FROM works WHERE museumId = ?;
 `)
 
+const updateWork = db.prepare(`
+    UPDATE works SET name =?, picture =?, museumId =? WHERE id =?;
+`)
+const updateMuseum = db.prepare(`
+    UPDATE museums SET name=?,city=? WHERE id=?;
+`)
+
 app.get('/museums', (req, res) => {
 
     const museums = getMuseums.all();
@@ -168,6 +175,70 @@ app.delete('/works/:id', (req, res) => {
         }
     } else {
         res.status(404).send({ error: 'Work not found!' })
+    }
+})
+
+app.patch('/works/:id', (req, res) => {
+    const id = req.params.id;
+    const { name, picture, museumId } = req.body;
+    const matchedWork = getWorksById.get(id);
+
+    const errors = [];
+
+    if (name && typeof name !== 'string') {
+        errors.push({ error: 'Name missing or not a string!' })
+    }
+    if (picture && typeof picture !== 'string') {
+        errors.push({ error: 'Picture missing or not a string!' })
+    }
+    if (museumId && typeof museumId !== 'number') {
+        errors.push({ error: 'Museum id missing or not a string!' })
+    }
+    if (errors.length === 0) {
+        if (matchedWork) {
+            const museum = getMuseumById.get(museumId);
+            if (museum) {
+                const result = updateWork.run(name ?? matchedWork.name, picture ?? matchedWork.picture, museumId ?? matchedWork.museumId, id)
+                const updatedWork = getWorksById.get(id)
+                res.send(updatedWork);
+
+            } else {
+                res.status(404).send('This museum does not exist!')
+            }
+        } else {
+            res.status(404).send({ error: 'Work not found!' })
+        }
+
+    } else {
+        res.status(400).send(errors)
+    }
+
+})
+
+app.patch('/museums/:id', (req, res) => {
+    const id = req.params.id;
+    const { name, city } = req.body;
+    const matchedMuseum = getMuseumById.get(id);
+
+    const errors = []
+
+    if (name && typeof name !== 'string') {
+        errors.push({ error: 'Name missing or not a string' })
+    }
+    if (city && typeof city !== 'string') {
+        errors.push({ errpr: 'City missing or not a string!' })
+    }
+
+    if (errors.length === 0) {
+        if (matchedMuseum) {
+            const result = updateMuseum.run(name ?? matchedMuseum.name, city ?? matchedMuseum.city, id)
+            const updatedMuseum = getMuseumById.get(id)
+            res.send(updateMuseum)
+        } else {
+            res.status(404).send({ message: 'Museum not found!' })
+        }
+    } else {
+        res.status(400).send(errors)
     }
 })
 
